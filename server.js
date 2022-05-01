@@ -1,64 +1,43 @@
 const express = require('express')
 const app = express()
 const args = require('minimist')(process.argv.slice(2))
+
+args['port', 'debug', 'log', 'help']
+const debug = args.debug || process.env.debug || 'false'
+const log = args.log || process.env.log || 'true'
+const help = (`
+server.js [options]
+--port	Set the port number for the server to listen on. Must be an integer
+            between 1 and 65535.
+--debug	If set to true, creates endlpoints /app/log/access/ which returns
+            a JSON access log from the database and /app/error which throws 
+            an error with the message "Error test successful." Defaults to 
+            false.
+--log		If set to false, no log files are written. Defaults to true.
+            Logs are always written to database.
+--help	Return this message and exit.
+`)
+// If --help or -h, echo help text to STDOUT and exit
+if (args.help || args.h) {
+    console.log(help)
+    process.exit(0)
+}
+
 const port = args.port || 5000;
+const fs = require('fs')
+const morgan = require('morgan');
 // Start an app server
 const server = app.listen(port, () => {
     console.group('App listening on port %PORT%'.replace('%PORT%',port))
 });
-function coinFlip() {
-    var randomNum = Math.random()
-    if (randomNum > 0.5) {
-      return "heads"
-    }
-    else {
-      return "tails"
-    }
-  }
-function coinFlips(flips) { 
-    let flipList = []; 
-    let i = 0; 
-    for (let i=0; i < flips; i++) {
-        flipList.push(coinFlip());
-    }
-    return flipList;
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+const db = require('./database.js')
+if(log == 'false'){
+const WRITESTREAM = fs.createWriteStream('accesslog', { flags: 'a' })
+app.use(morgan('combined', { stream: WRITESTREAM }))
 }
-function countFlips(array) {
-    var count;
-    var heads = 0;
-    var tails = 0;
-    var i = 0;
-    for (let i=0; i < array.length; i++) {
-        if (array[i] === "tails") {
-        tails += 1;
-        } else {
-        heads += 1;
-        }
-}
-    if (heads == 0) {
-        count = { tails };
-    } else if (tails == 0) {
-        count = { heads };
-    } else {
-        count = { tails, heads }; 
-    }
-    return count;
-}
-function flipACoin(call) {
-    var statement = {
-      call,
-      flip: coinFlip(),
-      result: " ",
-    }; 
-  
-    if (statement.call == statement.flip) {
-      statement.result = "win";
-    } 
-    else {
-      statement.result = "lose";
-    } 
-    return statement; 
-  }
+
 app.get('/app/', (req, res) => {
     // Respond with status 200
         res.statusCode = 200;
