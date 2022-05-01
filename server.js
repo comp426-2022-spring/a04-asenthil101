@@ -38,33 +38,36 @@ const WRITESTREAM = fs.createWriteStream('accesslog', { flags: 'a' })
 app.use(morgan('combined', { stream: WRITESTREAM }))
 }
 
-app.get('/app/', (req, res) => {
-    // Respond with status 200
-        res.statusCode = 200;
-    // Respond with status message "OK"
-        res.statusMessage = 'OK';
-        res.writeHead( res.statusCode, { 'Content-Type' : 'text/plain' });
-        res.end(res.statusCode+ ' ' +res.statusMessage)
-    });
-app.get('/app/flip', (req,res) => {
-        res.contentType('text/json');
-        res.status(200).json({'flip' : coinFlip()});
-    });
-app.get('/app/flips/:number', (req, res) => {
-    res.contentType('text/json');
-    const flips = coinFlips(req.params.number);
-    const count = countFlips(flips);
-    res.status(200).json({'raw':flips,'summary' : count});
+app.get("/app/", (req, res, next) => {
+    res.json({"message":"Your API works! (200)"});
+	res.status(200);
 });
-app.get('/app/flip/call/heads', (req,res) => {
-    res.contentType('text/json');
-    res.status(200).json(flipACoin('heads'));
-});
-app.get('/app/flip/call/tails', (req,res) => {
-    res.contentType('text/json');
-    res.status(200).json(flipACoin('tails'));
-});
-// Default response for any other request
-app.use(function(req, res){
-    res.status(404).send('404 NOT FOUND')
-});
+const myFunc = function(req, res, next) {
+	let logdata = {
+        remoteaddr: req.ip,
+        remoteuser: req.user,
+        time: Date.now(),
+        method: req.method,
+        url: req.url,
+        protocol: req.protocol,
+        httpversion: req.httpVersion,
+        status: res.statusCode,
+        referer: req.headers['referer'],
+        useragent: req.headers['user-agent']
+    };
+    const stmt = db.prepare('INSERT INTO accesslog (remoteaddr, remoteuser, time, method, url, protocol, httpversion, status, referer, useragent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    const info = stmt.run(logdata.remoteaddr, logdata.remoteuser, logdata.time, logdata.method, logdata.url, logdata.protocol, logdata.httpversion, logdata.status, logdata.referer, logdata.useragent)
+    next()
+    // res.status(200).json(info)
+};
+if(debug == true){
+    app.get("/app/error", (req, res) => {
+        throw new Error("Error test succesful.")
+    })
+    app.get("/app/log/access", myFunc, (req, res) => {	
+            const stmt = db.prepare('SELECT * FROM accesslog').all()
+            console.log(stmt)
+            res.status(200).json(stmt)
+    } )
+
+}
